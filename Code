@@ -1,0 +1,69 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+from statsmodels.tsa.arima.model import ARIMA
+from prophet import Prophet
+
+# Streamlit UI Setup
+st.title("Retail Sales Trend Analyzer")
+st.sidebar.header("Upload Sales Data")
+
+# File Upload
+uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=["csv"])
+if uploaded_file:
+    df = pd.read_csv(uploaded_file, parse_dates=['Date'])
+    df = df.sort_values(by='Date')
+    st.write("## Data Overview")
+    st.dataframe(df.head())
+    
+    # Data Preprocessing
+    df['Year'] = df['Date'].dt.year
+    df['Month'] = df['Date'].dt.month
+    df['Day'] = df['Date'].dt.day
+
+    
+    # Trend Analysis
+    st.write("## Sales Trend Analysis")
+    fig = px.line(df, x='Date', y='Sales', title='Sales Over Time')
+    st.plotly_chart(fig)
+    
+    # Seasonality Insights
+    st.write("## Seasonality Insights")
+    df['Month-Year'] = df['Year'].astype(str) + '-' + df['Month'].astype(str)
+    monthly_sales = df.groupby('Month-Year')['Sales'].sum().reset_index()
+    monthly_sales['Month-Year'] = monthly_sales['Month-Year'].astype(str)
+    fig2 = px.line(monthly_sales, x='Month-Year', y='Sales', title='Monthly Sales Trend')
+    st.plotly_chart(fig2)
+    
+    # Product Performance Insights
+    st.write("## Product Performance Insights")
+    product_sales = df.groupby('Product Category')['Sales'].sum().reset_index()
+    fig3 = px.bar(product_sales, x='Product Category', y='Sales', title='Top Performing Products')
+    st.plotly_chart(fig3)
+    
+    # Sales Forecasting
+    st.write("## Sales Forecasting")
+    forecast_period = st.sidebar.slider("Select Forecast Period (Days)", 7, 365, 30)
+    
+    forecast_df = df[['Date', 'Sales']].rename(columns={'Date': 'ds', 'Sales': 'y'})
+    model = Prophet()
+    model.fit(forecast_df)
+    future = model.make_future_dataframe(periods=forecast_period)
+    forecast = model.predict(future)
+    
+    fig4 = px.line(forecast, x='ds', y='yhat', title='Sales Forecast')
+    st.plotly_chart(fig4)
+    
+    # Recommendations
+    st.write("## Actionable Insights")
+    st.write("- Stock up on high-demand products during peak sales periods.")
+    st.write("- Plan promotional campaigns based on seasonality trends.")
+    st.write("- Adjust inventory levels based on forecasted demand.")
+    
+    # Report Generation
+    if st.button("Download Report"):
+        report_csv = forecast[['ds', 'yhat']].to_csv(index=False)
+        st.download_button("Download Forecast Report", report_csv, "sales_forecast.csv", "text/csv")
